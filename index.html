@@ -527,7 +527,7 @@
   function draw(){
     let sx=0,sy=0; if(shake>0.2){ sx=(Math.random()-0.5)*shake; sy=(Math.random()-0.5)*shake; }
     ctx.save(); ctx.translate(sx,sy);
-    drawSky(); drawStars(); drawSun();
+    drawSky(); drawStars(); drawSun(); drawGlassFloor();
     const sorted=clouds.slice().sort((a,b)=>b.z-a.z);   // far clouds first
     for(const c of sorted) drawCloud(c);
     if(state!==ST.DEAD || deathTimer<0.4) drawRobot();
@@ -680,6 +680,20 @@
     ctx.restore();
   }
 
+  function drawGlassFloor(){
+    const topY=project(0,0,12).y;                 // front "waterline" of the glass — recedes as you climb
+    if(topY>=H) return;                            // floor has scrolled off the bottom -> gone
+    const fade=Math.max(0,Math.min(1,(H-topY)/(H*0.45)));
+    ctx.save(); ctx.globalAlpha=fade;
+    const g=ctx.createLinearGradient(0,topY,0,H);  // frosted glass: see-through at the far edge, solid up close
+    g.addColorStop(0,'rgba(196,238,255,0.20)'); g.addColorStop(0.5,'rgba(174,224,255,0.52)'); g.addColorStop(1,'rgba(150,212,255,0.72)');
+    ctx.fillStyle=g; ctx.fillRect(0,topY,W,H-topY);
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillRect(0,topY,W,Math.max(1.5,H*0.004));   // bright leading edge
+    ctx.globalAlpha=fade*0.45;                     // diagonal reflective sheen
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=H*0.012; ctx.lineCap='round';
+    for(let i=0;i<3;i++){ const x=W*(0.22+i*0.3); ctx.beginPath(); ctx.moveTo(x,topY); ctx.lineTo(x-W*0.12,H); ctx.stroke(); }
+    ctx.restore();
+  }
   function drawBar(o){
     const tl=project(-TRACK_W,o.hi,o.z), tr=project(TRACK_W,o.hi,o.z);
     const br=project(TRACK_W,o.lo,o.z),  bl=project(-TRACK_W,o.lo,o.z);
