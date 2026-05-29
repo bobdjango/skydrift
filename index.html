@@ -472,7 +472,8 @@
 
     // AUTO-BOUNCE when you genuinely land on a cloud; tapping as you land = PERFECT
     for(const c of clouds){
-      if(!c.used && Math.abs(c.z-Z_ROBOT)<1.4 && Math.abs(ry-c.wy)<0.75){   // wider timing window = forgiving landings
+      // bounce zone is tied to each cloud's drawn size (0.82*cscale radius) so it matches the visual exactly
+      if(!c.used && Math.abs(c.z-Z_ROBOT)<1.25 && Math.abs(ry-c.wy) < 0.34+0.5*(c.cscale||1)){
         c.used=true; c.puff=0.4;
         const p=project(0,c.wy,Z_ROBOT);
         const refill = jammed>0?1:2;                 // jam caps refills at a single jump
@@ -723,10 +724,6 @@
     else if(c.type==='crumble'){ top='#ece0c8'; bot='#b89a72'; rim='#8c7250'; }
     const alpha=Math.max(0.5,Math.min(1,1-(c.z-18)/72))*flick;
     ctx.save(); ctx.globalAlpha=alpha;
-    // soft shadow halo behind -> separation from a bright/pale background
-    const sg=ctx.createRadialGradient(p.x,p.y+r*0.1,r*0.5,p.x,p.y+r*0.1,r*1.5);
-    sg.addColorStop(0,'rgba(60,40,95,0.20)'); sg.addColorStop(1,'rgba(60,40,95,0)');
-    ctx.fillStyle=sg; ctx.beginPath(); ctx.ellipse(p.x,p.y+r*0.1,r*1.45,r*1.0,0,0,6.2832); ctx.fill();
     cloudSilhouette(p.x,p.y,r*1.06); ctx.fillStyle=rim; ctx.fill();   // darker rim = clean outline
     cloudSilhouette(p.x,p.y,r);                                       // candy body gradient
     const bg=ctx.createLinearGradient(0,p.y-r*0.5,0,p.y+r*0.5);
