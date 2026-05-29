@@ -259,7 +259,7 @@
   let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT, hudP, hudLast;
   let clouds, particles, pops, stars, motes;
   let shake, deathTimer;
-  let DEBUG_BOT=false, FORCE=null;   // dev-only helpers
+  let DEBUG_BOT=false, FORCE=null, BG=0;   // dev-only helpers (BG = background style)
 
   const LS_BOARD='skydrift_board_v4', LS_ACCT='skydrift_acct_v1';
   let account=null;
@@ -551,18 +551,73 @@
     {a:[6,22,32],   b:[22,82,92],   c:[70,155,125]},    // AURORA
     {a:[2,3,14],    b:[12,14,46],   c:[38,28,80]},      // SPACE
   ];
-  const SKY_NAMES=['SUNSET','DUSK','NIGHT','AURORA','SPACE'];
+  const SKY_NAMES=['DREAM ISLES','CRYSTAL RIFT','STORM CROWN','AURORA SEA','COSMIC DEEP'];
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
-  function drawSky(){
+  // ---- photographic world background (loaded image) ----
+  const PHOTO=new Image(); let photoOk=false; PHOTO.onload=()=>photoOk=true; PHOTO.src='world1.jpg';
+  function drawPhotoBg(){
+    const iw=PHOTO.naturalWidth, ih=PHOTO.naturalHeight;
+    const scale=Math.max(W/iw, H/ih)*1.25;          // cover + 25% zoom for vertical pan room
+    const dw=iw*scale, dh=ih*scale, dx=(W-dw)/2, pan=dh-H;
+    const f=Math.min(1,(maxRy*10)/900);             // climb pans from the islands (bottom) up into open sky (top)
+    ctx.drawImage(PHOTO, dx, -pan*(1-f), dw, dh);
+  }
+  function mul(c,f){ return [Math.round(Math.min(255,c[0]*f)),Math.round(Math.min(255,c[1]*f)),Math.round(Math.min(255,c[2]*f))]; }
+  function rgba(c,a){ return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
+  function skyPalette(){
     const hg=maxRy*10, T=1000, n=SKIES.length;
     const i=Math.min(n-1,Math.floor(hg/T)), j=Math.min(n-1,i+1), t=Math.min(1,(hg-i*T)/T);
-    const A=lc(SKIES[i].a,SKIES[j].a,t), B=lc(SKIES[i].b,SKIES[j].b,t), C=lc(SKIES[i].c,SKIES[j].c,t);
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,rgbs(A)); g.addColorStop(0.6,rgbs(B)); g.addColorStop(1,rgbs(C));
+    return { A:lc(SKIES[i].a,SKIES[j].a,t), B:lc(SKIES[i].b,SKIES[j].b,t), C:lc(SKIES[i].c,SKIES[j].c,t) };
+  }
+  function drawSky(){
+    if(photoOk) return drawPhotoBg();       // real photographic background when loaded
+    const P=skyPalette();
+    if(BG===1) return drawSkyCinematic(P);
+    if(BG===2) return drawSkyAurora(P);
+    if(BG===3) return drawSkyStrata(P);
+    const g=ctx.createLinearGradient(0,0,0,H);              // BG 0 — current flat 3-stop gradient
+    g.addColorStop(0,rgbs(P.A)); g.addColorStop(0.6,rgbs(P.B)); g.addColorStop(1,rgbs(P.C));
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
   }
+  function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
+    const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,rgbs(top)); g.addColorStop(0.34,rgbs(A)); g.addColorStop(0.6,rgbs(B));
+    g.addColorStop(0.86,rgbs(C)); g.addColorStop(1,rgbs(hi));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const HOR=horizon();                                    // warm glow blooming up from the horizon
+    const gb=ctx.createRadialGradient(W/2,HOR*1.05,0,W/2,HOR*1.05,Math.max(W,H)*0.8);
+    gb.addColorStop(0,rgba(hi,0.5)); gb.addColorStop(0.45,rgba(lc(B,C,0.5),0.12)); gb.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gb; ctx.fillRect(0,0,W,H);
+  }
+  function drawSkyAurora({A,B,C}){                          // BG 2 — deep sky + flowing aurora ribbons
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,rgbs(mul(A,0.45))); g.addColorStop(0.55,rgbs(A)); g.addColorStop(1,rgbs(mul(B,0.85)));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
+    const cols=[[90,255,180],[120,150,255],[255,120,200]];
+    for(let r=0;r<3;r++){ const baseY=H*(0.16+r*0.15), amp=H*0.045, col=cols[r];
+      for(let pass=0;pass<3;pass++){ ctx.strokeStyle=rgba(col,0.05); ctx.lineWidth=H*(0.11-pass*0.034);
+        ctx.beginPath();
+        for(let x=0;x<=W;x+=16){ const y=baseY+Math.sin(x*0.011+distance*0.12+r*2)*amp+Math.sin(x*0.027+r)*amp*0.5;
+          x===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+        ctx.stroke();
+      } }
+    ctx.restore();
+  }
+  function drawSkyStrata({A,B,C}){                          // BG 3 — soft horizontal light layers scrolling as you climb
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,rgbs(mul(A,0.7))); g.addColorStop(0.6,rgbs(B)); g.addColorStop(1,rgbs(C));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const tint=lc(C,[255,250,240],0.6), step=H*0.5, scroll=((camHeight()*26)%step+step)%step;
+    for(let k=-1;k<5;k++){ const y=H-(k*step-scroll);
+      const band=ctx.createLinearGradient(0,y-H*0.2,0,y+H*0.04);
+      band.addColorStop(0,rgba(tint,0)); band.addColorStop(0.72,rgba(tint,0.11)); band.addColorStop(1,rgba(tint,0));
+      ctx.fillStyle=band; ctx.fillRect(0,y-H*0.2,W,H*0.24); }
+  }
   function drawStars(){
+    if(photoOk) return;                                // photo background supplies its own sky
     const boost=Math.min(1.7, 0.5+(maxRy*10)/1500);   // stars get brighter the higher you climb
     ctx.fillStyle='#fff';
     for(const s of stars){ const x=((s.x-distance*0.02)%W+W)%W;
@@ -571,6 +626,7 @@
     ctx.globalAlpha=1;
   }
   function drawSun(){
+    if(photoOk) return;                                // photo background supplies its own sun/light
     const cx=W*0.5, cy=horizon()*0.96, R=Math.min(W,H)*0.34;
     ctx.fillStyle=G_sun; ctx.beginPath(); ctx.arc(cx,cy,R,0,6.2832); ctx.fill();
   }
@@ -825,6 +881,7 @@
   account=loadAccount(); refreshMenu();
   const _p=new URLSearchParams(location.search);
   if(_p.has('bot')) DEBUG_BOT=true;
+  if(_p.has('bg')) BG=parseInt(_p.get('bg'))||0;   // dev: background style 0-3
   if(_p.has('char')) selChar=Math.max(0,Math.min(CHARACTERS.length-1,parseInt(_p.get('char'))||0));  // dev
   if(_p.has('force')){ FORCE=_p.get('force');
     clouds.push({z:13, wy:1.3, baseWy:1.3, drift:false, dphase:0, damp:0, used:false, missed:false, puff:0, type:FORCE}); }
