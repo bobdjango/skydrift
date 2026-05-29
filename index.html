@@ -712,6 +712,11 @@
 
     alpha *= Math.max(0.45, Math.min(1, 1-(c.z-18)/72));   // atmospheric haze: far clouds fade softer
     ctx.globalAlpha=alpha;
+    if(c.type!=='fake'){   // soft shadow so white clouds separate from the pale pastel sky
+      const sg=ctx.createRadialGradient(p.x,p.y+r*0.3,r*0.15,p.x,p.y+r*0.3,r*1.35);
+      sg.addColorStop(0,'rgba(108,86,140,0.30)'); sg.addColorStop(1,'rgba(108,86,140,0)');
+      ctx.fillStyle=sg; ctx.beginPath(); ctx.ellipse(p.x,p.y+r*0.3,r*1.35,r*0.95,0,0,6.2832); ctx.fill();
+    }
     cloudSilhouette(p.x,p.y,r); ctx.fillStyle=base; ctx.fill();   // no per-cloud glow (mobile perf)
 
     // light-blue underside + scallop shadows + bright top (fake stays flat/ghostly)
@@ -834,6 +839,10 @@
     if(gp.y>horizon() && gp.y<H+40){ ctx.save(); ctx.fillStyle='rgba(20,8,40,.28)';
       const altF=Math.min(1,ry/8);
       ctx.beginPath(); ctx.ellipse(gp.x,gp.y,sz*1.4*(1-altF*0.6),sz*0.45*(1-altF*0.6),0,0,6.2832); ctx.fill(); ctx.restore(); }
+    // soft contrast halo so a pale character reads against the pale pastel sky
+    const hg=ctx.createRadialGradient(p.x,p.y,sz*0.2,p.x,p.y,sz*1.7);
+    hg.addColorStop(0,'rgba(70,52,104,0.34)'); hg.addColorStop(0.7,'rgba(70,52,104,0.14)'); hg.addColorStop(1,'rgba(70,52,104,0)');
+    ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(p.x,p.y,sz*1.7,0,6.2832); ctx.fill();
     ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.max(-0.18,Math.min(0.18,vy*0.018)));
     const st=Math.max(-0.16,Math.min(0.26, vy*0.02)); ctx.scale(1-st*0.5, 1+st);   // squash & stretch juice
     drawCharacter(ctx, CHARACTERS[selChar], sz);
