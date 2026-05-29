@@ -257,7 +257,7 @@
   let state = ST.MENU;
   let ry, vy, jumpsLeft, jumpFlash, maxRy, distance, worldSpeed, distSinceObs, nextGap, cloudY, leftGround;
   let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT, hudP, hudLast;
-  let clouds, particles, pops, stars, motes, streaks;
+  let clouds, particles, pops, stars, motes;
   let shake, deathTimer;
   let DEBUG_BOT=false, FORCE=null;   // dev-only helpers
 
@@ -282,40 +282,11 @@
   function initMotes(){   // faint DISTANT background clouds — parallax depth, fills the empty sky
     motes=[]; for(let i=0;i<7;i++) motes.push({x:Math.random()*W, y:Math.random()*(H+260), r:55+Math.random()*95});
   }
-  // ---- WIND SPEED-LINES: faint streaks that flow in from the distance at the SAME rate as the
-  //      clouds, radiating outward as they approach. Fills the empty sky with honest forward
-  //      motion so you can read depth/speed — without a floor or busy background clouds. ----
-  function spawnStreak(z){
-    const s=focal()/z;
-    const sx=Math.random()*W, sy=Math.random()*H;                 // pick a screen spot at this depth...
-    return { wx:(sx-W/2)/s, wy:camHeight()-(sy-horizon())/s, z, len:5+Math.random()*7 };  // ...back-solve world pos
-  }
-  function initStreaks(){
-    streaks=[]; for(let i=0;i<52;i++) streaks.push(spawnStreak(Z_NEAR + Math.random()*(Z_FAR-Z_NEAR)));
-  }
-  function updateStreaks(dt){
-    for(let i=0;i<streaks.length;i++){ streaks[i].z-=worldSpeed*dt;
-      if(streaks[i].z<=Z_NEAR) streaks[i]=spawnStreak(Z_FAR-Math.random()*12); }   // recycle to far distance
-  }
-  function drawStreaks(){
-    ctx.save(); ctx.lineCap='round';
-    for(const k of streaks){
-      if(k.z<=Z_NEAR) continue;
-      const t=(k.z-Z_NEAR)/(Z_FAR-Z_NEAR);                         // 1 = far, 0 = near
-      const al=0.42*Math.min(1,(1-t)*2)*Math.min(1,(k.z-Z_NEAR)/6);// visible across the near half, fade out at the very front
-      if(al<0.004) continue;
-      const a=project(k.wx,k.wy,k.z), b=project(k.wx,k.wy,k.z+k.len);
-      ctx.strokeStyle='rgba(226,242,255,'+al.toFixed(3)+')';
-      ctx.lineWidth=Math.max(1, Math.min(4, a.s*0.04));   // streaks, capped so close ones don't blob
-      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-    }
-    ctx.restore();
-  }
   function reset(){
     ry=0; vy=0; jumpsLeft=2; jumpFlash=0; maxRy=0; distance=0;
     worldSpeed=16; distSinceObs=0; nextGap=15; cloudY=1.0; leftGround=false;
     combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0;
-    clouds=[]; particles=[]; pops=[]; initMotes(); initStreaks();
+    clouds=[]; particles=[]; pops=[]; initMotes();
     shake=0; deathTimer=0;
     // a gentle ascending ladder of REAL clouds (gap only BETWEEN them -> no stray big space)
     for(let i=0;i<6;i++){ clouds.push({ z:25+i*14, wy:cloudY, used:false, missed:false, puff:0, type:'normal', cscale:0.85+Math.random()*0.32 }); if(i<5) cloudY+=1.2+Math.random()*0.9; }
@@ -473,7 +444,6 @@
     const spd = Math.min(1, H/1500);     // speed ramps SLOWLY over a long climb, caps at height 1500
     worldSpeed = 13 + spd*7;             // 13 -> 20 only (much calmer — was 14->26)
     distance+=worldSpeed*dt;
-    updateStreaks(dt);
 
     // MILESTONE timers: jam (3k) wears off; downdrafts (2k) surge periodically
     if(jammed>0) jammed-=dt;
@@ -557,7 +527,7 @@
   function draw(){
     let sx=0,sy=0; if(shake>0.2){ sx=(Math.random()-0.5)*shake; sy=(Math.random()-0.5)*shake; }
     ctx.save(); ctx.translate(sx,sy);
-    drawSky(); drawStars(); drawSun(); drawStreaks();
+    drawSky(); drawStars(); drawSun();
     const sorted=clouds.slice().sort((a,b)=>b.z-a.z);   // far clouds first
     for(const c of sorted) drawCloud(c);
     if(state!==ST.DEAD || deathTimer<0.4) drawRobot();
