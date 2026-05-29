@@ -551,7 +551,7 @@
     {a:[6,22,32],   b:[22,82,92],   c:[70,155,125]},    // AURORA
     {a:[2,3,14],    b:[12,14,46],   c:[38,28,80]},      // SPACE
   ];
-  const SKY_NAMES=['DREAM ISLES','CRYSTAL RIFT','STORM CROWN','AURORA SEA','COSMIC DEEP'];
+  const SKY_NAMES=['DREAM DUNES','CRYSTAL HAZE','CLOUD TEMPLE','AURORA DREAM','COSMIC DREAM'];
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
   // ---- photographic world background (loaded image) ----
@@ -560,8 +560,8 @@
     const iw=PHOTO.naturalWidth, ih=PHOTO.naturalHeight;
     const scale=Math.max(W/iw, H/ih)*1.25;          // cover + 25% zoom for vertical pan room
     const dw=iw*scale, dh=ih*scale, dx=(W-dw)/2, pan=dh-H;
-    const f=Math.min(1,(maxRy*10)/900);             // climb pans from the islands (bottom) up into open sky (top)
-    ctx.drawImage(PHOTO, dx, -pan*(1-f), dw, dh);
+    const f=Math.min(1,(maxRy*10)/900);             // climb pans from the dunes (bottom) up into open sky (top)
+    ctx.drawImage(PHOTO, dx, -pan*(1-f), dw, dh);    // image is already dreamy pastel — no grade needed
   }
   function mul(c,f){ return [Math.round(Math.min(255,c[0]*f)),Math.round(Math.min(255,c[1]*f)),Math.round(Math.min(255,c[2]*f))]; }
   function rgba(c,a){ return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
