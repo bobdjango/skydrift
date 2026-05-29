@@ -20,8 +20,15 @@
   #hud{ position:absolute; top:0; left:0; right:0; padding:18px 22px;
     display:flex; justify-content:space-between; align-items:flex-start;
     pointer-events:none; z-index:5; text-shadow:0 2px 12px rgba(0,0,0,.35); }
-  #score{ font-weight:800; font-size:42px; line-height:1; letter-spacing:-1px; }
+  #score{ font-weight:800; font-size:46px; line-height:1; letter-spacing:-1px; transform-origin:left center; display:inline-block; }
   #scoreLabel{ font-size:12px; font-weight:600; opacity:.7; letter-spacing:3px; }
+  .hrow{ display:flex; align-items:baseline; gap:5px; }
+  .unit{ font-size:20px; font-weight:800; opacity:.55; }
+  .worldrow{ font-size:11px; font-weight:800; letter-spacing:2px; margin-top:8px; }
+  .worldrow #worldName{ color:#fff; opacity:.92; }
+  .worldrow #nextWorld{ opacity:.45; margin-left:7px; }
+  .prog{ margin-top:6px; width:150px; height:5px; border-radius:99px; background:rgba(255,255,255,.16); overflow:hidden; }
+  #progFill{ height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,#7af0ff,#46e6ff); transition:width .15s linear; }
   .fuel{ margin-top:12px; width:150px; height:14px; border-radius:99px;
     background:rgba(255,255,255,.16); overflow:hidden; border:1px solid rgba(255,255,255,.28); }
   #fuelFill{ height:100%; width:100%; border-radius:99px;
@@ -109,9 +116,11 @@
   <canvas id="game"></canvas>
 
   <div id="hud" class="hidden">
-    <div>
+    <div class="hudTop">
       <div id="scoreLabel">HEIGHT</div>
-      <div id="score">0</div>
+      <div class="hrow"><span id="score">0</span><span class="unit">m</span></div>
+      <div class="worldrow"><span id="worldName">SUNSET</span><span id="nextWorld"></span></div>
+      <div class="prog"><div id="progFill"></div></div>
     </div>
     <div id="combo" class="combo hidden"></div>
     <div id="jamWarn" class="jamwarn hidden"></div>
@@ -245,7 +254,7 @@
   const ST = { MENU:0, PLAY:1, DEAD:2 };
   let state = ST.MENU;
   let ry, vy, jumpsLeft, jumpFlash, maxRy, distance, worldSpeed, distSinceObs, nextGap, cloudY, leftGround;
-  let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT;
+  let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT, hudP, hudLast;
   let clouds, particles, pops, stars, motes;
   let shake, deathTimer;
   let DEBUG_BOT=false, FORCE=null;   // dev-only helpers
@@ -274,7 +283,7 @@
   function reset(){
     ry=0; vy=0; jumpsLeft=2; jumpFlash=0; maxRy=0; distance=0;
     worldSpeed=16; distSinceObs=0; nextGap=15; cloudY=1.0; leftGround=false;
-    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0;
+    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0;
     clouds=[]; particles=[]; pops=[]; initMotes();
     shake=0; deathTimer=0;
     // a gentle ascending ladder of REAL clouds (gap only BETWEEN them -> no stray big space)
@@ -489,7 +498,14 @@
 
     clouds=clouds.filter(c=>(c.z>Z_NEAR && !c.used)||c.puff>0);
     updateParticles(dt);
-    document.getElementById('score').textContent=scoreNow();
+    const Hgt=maxRy*10;
+    const sEl=document.getElementById('score'); sEl.textContent=scoreNow();
+    hudP=Math.max(0,hudP-dt*5); if(Math.floor(Hgt/25)>hudLast){ hudLast=Math.floor(Hgt/25); hudP=1; }   // pop as you climb
+    sEl.style.transform='scale('+(1+hudP*0.16)+')';
+    const htier=Math.min(SKY_NAMES.length-1, Math.floor(Hgt/1000));
+    document.getElementById('worldName').textContent=SKY_NAMES[htier];
+    document.getElementById('nextWorld').textContent = htier<SKY_NAMES.length-1 ? ('→ '+SKY_NAMES[htier+1]) : '★ MAX';
+    document.getElementById('progFill').style.width = (htier<SKY_NAMES.length-1 ? (Hgt%1000)/10 : 100)+'%';
     const cEl=document.getElementById('combo');
     if(combo>=2){ cEl.classList.remove('hidden'); cEl.textContent='COMBO ×'+combo; }
     else cEl.classList.add('hidden');
