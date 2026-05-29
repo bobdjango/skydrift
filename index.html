@@ -288,10 +288,10 @@
   function spawnStreak(z){
     const s=focal()/z;
     const sx=Math.random()*W, sy=Math.random()*H;                 // pick a screen spot at this depth...
-    return { wx:(sx-W/2)/s, wy:camHeight()-(sy-horizon())/s, z, len:3+Math.random()*4 };  // ...back-solve world pos
+    return { wx:(sx-W/2)/s, wy:camHeight()-(sy-horizon())/s, z, len:5+Math.random()*7 };  // ...back-solve world pos
   }
   function initStreaks(){
-    streaks=[]; for(let i=0;i<22;i++) streaks.push(spawnStreak(Z_NEAR + Math.random()*(Z_FAR-Z_NEAR)));
+    streaks=[]; for(let i=0;i<52;i++) streaks.push(spawnStreak(Z_NEAR + Math.random()*(Z_FAR-Z_NEAR)));
   }
   function updateStreaks(dt){
     for(let i=0;i<streaks.length;i++){ streaks[i].z-=worldSpeed*dt;
@@ -302,11 +302,11 @@
     for(const k of streaks){
       if(k.z<=Z_NEAR) continue;
       const t=(k.z-Z_NEAR)/(Z_FAR-Z_NEAR);                         // 1 = far, 0 = near
-      const al=0.20*(1-t)*Math.min(1,(k.z-Z_NEAR)/8);              // fade in approaching, fade out at the very front
+      const al=0.42*Math.min(1,(1-t)*2)*Math.min(1,(k.z-Z_NEAR)/6);// visible across the near half, fade out at the very front
       if(al<0.004) continue;
       const a=project(k.wx,k.wy,k.z), b=project(k.wx,k.wy,k.z+k.len);
-      ctx.strokeStyle='rgba(222,240,255,'+al.toFixed(3)+')';
-      ctx.lineWidth=Math.max(0.8, Math.min(3, a.s*0.03));   // thin streaks, capped so close ones don't blob
+      ctx.strokeStyle='rgba(226,242,255,'+al.toFixed(3)+')';
+      ctx.lineWidth=Math.max(1, Math.min(4, a.s*0.04));   // streaks, capped so close ones don't blob
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
     }
     ctx.restore();
