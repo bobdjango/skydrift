@@ -724,8 +724,7 @@
     else if(c.type==='crumble'){ top='#ece0c8'; bot='#b89a72'; rim='#8c7250'; }
     const alpha=Math.max(0.5,Math.min(1,1-(c.z-18)/72))*flick;
     ctx.save(); ctx.globalAlpha=alpha;
-    cloudSilhouette(p.x,p.y,r*1.06); ctx.fillStyle=rim; ctx.fill();   // darker rim = clean outline
-    cloudSilhouette(p.x,p.y,r);                                       // candy body gradient
+    cloudSilhouette(p.x,p.y,r);                                       // candy body gradient (no outline)
     const bg=ctx.createLinearGradient(0,p.y-r*0.5,0,p.y+r*0.5);
     bg.addColorStop(0,top); bg.addColorStop(1,bot);
     ctx.fillStyle=bg; ctx.fill();
