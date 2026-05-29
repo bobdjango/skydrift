@@ -205,6 +205,7 @@
     { id:'robot', name:'Robo' },
     { id:'ghost', name:'Wisp' },
     { id:'ice',   name:'Ice'  },
+    { id:'alien', name:'Zorp' },
   ];
   // jump "trail" effects — chosen independently from the character
   const EFFECTS = [
@@ -212,6 +213,7 @@
     { id:'fire',    name:'Fire',    kind:'solid',  colors:['#ffe06a','#ff8a3c','#ff5236'] },
     { id:'ice',     name:'Ice',     kind:'solid',  colors:['#eaffff','#bdf0ff','#7fd6f5'] },
     { id:'rainbow', name:'Rainbow', kind:'bubble', colors:['#ff6ba8','#ffd23c','#7af0ff','#a06bff'] },
+    { id:'plasma',  name:'Plasma',  kind:'solid',  colors:['#9fffba','#7af0ff','#c08bff'] },
   ];
   let selChar = Math.max(0, Math.min(CHARACTERS.length-1, parseInt(localStorage.getItem('skydrift_char')||'0',10)||0));
   let selFx   = Math.max(0, Math.min(EFFECTS.length-1,   parseInt(localStorage.getItem('skydrift_fx')||'0',10)||0));
@@ -720,10 +722,52 @@
     g.beginPath(); g.moveTo(-s*0.3,-s); g.lineTo(-s*0.3,s); g.moveTo(s*0.3,-s); g.lineTo(s*0.3,s); g.stroke();
     g.fillStyle='#ffffff'; g.beginPath(); g.arc(s*0.45,-s*0.45,s*0.1,0,6.2832); g.fill();        // sparkle
   }
+  function drawAlien(g,S){
+    // --- WINGS (drawn behind the body) — translucent fairy/dragonfly wings ---
+    for(const s of [-1,1]){
+      g.save(); g.translate(s*S*0.42,-S*0.18); g.rotate(s*0.55);
+      const wg=g.createLinearGradient(0,0,s*S*0.9,S*0.4);
+      wg.addColorStop(0,'rgba(180,255,235,0.65)'); wg.addColorStop(1,'rgba(120,200,255,0.18)');
+      g.fillStyle=wg;
+      g.beginPath(); g.ellipse(s*S*0.45,-S*0.05,S*0.5,S*0.27,0,0,6.2832); g.fill();   // upper wing
+      g.beginPath(); g.ellipse(s*S*0.34,S*0.32,S*0.34,S*0.2,0,0,6.2832); g.fill();    // lower wing
+      g.strokeStyle='rgba(255,255,255,0.5)'; g.lineWidth=Math.max(1,S*0.03);          // wing veins
+      g.beginPath(); g.moveTo(s*S*0.02,-S*0.02); g.lineTo(s*S*0.9,-S*0.05);
+      g.moveTo(s*S*0.05,S*0.05); g.lineTo(s*S*0.62,S*0.18); g.stroke();
+      g.restore();
+    }
+    // --- ANTENNAE with glowing bulb tips ---
+    g.strokeStyle='#7fe0a8'; g.lineWidth=Math.max(1.5,S*0.05); g.lineCap='round';
+    for(const s of [-1,1]){
+      g.beginPath(); g.moveTo(s*S*0.16,-S*0.6); g.quadraticCurveTo(s*S*0.34,-S*1.0,s*S*0.24,-S*1.18); g.stroke();
+      g.fillStyle='#ffe05c'; g.shadowColor='#ffe05c'; g.shadowBlur=S*0.3;
+      g.beginPath(); g.arc(s*S*0.24,-S*1.2,Math.max(2,S*0.1),0,6.2832); g.fill(); g.shadowBlur=0;
+    }
+    // --- BODY (back view) — teal-green, glowing ---
+    g.shadowColor='rgba(110,240,170,0.6)'; g.shadowBlur=S*0.5;
+    const bg=g.createRadialGradient(-S*0.2,-S*0.35,S*0.1,0,0,S*1.0);
+    bg.addColorStop(0,'#e6fff0'); bg.addColorStop(0.5,'#7fe6a6'); bg.addColorStop(1,'#3cb87e');
+    g.fillStyle=bg; g.beginPath(); g.ellipse(0,0,S*0.62,S*0.74,0,0,6.2832); g.fill(); g.shadowBlur=0;
+    // back spine ridge + bumps
+    g.strokeStyle='rgba(40,140,95,0.55)'; g.lineWidth=Math.max(1.5,S*0.05);
+    g.beginPath(); g.moveTo(0,-S*0.62); g.lineTo(0,S*0.6); g.stroke();
+    g.fillStyle='rgba(40,140,95,0.5)';
+    for(let i=-1;i<=2;i++){ g.beginPath(); g.arc(0,i*S*0.28,S*0.07,0,6.2832); g.fill(); }
+    // spots (detail)
+    g.fillStyle='rgba(255,255,255,0.45)';
+    g.beginPath(); g.arc(-S*0.3,-S*0.25,S*0.08,0,6.2832); g.fill();
+    g.beginPath(); g.arc(S*0.32,-S*0.05,S*0.06,0,6.2832); g.fill();
+    g.beginPath(); g.arc(-S*0.22,S*0.32,S*0.05,0,6.2832); g.fill();
+    // little feet
+    g.fillStyle='#2e9468';
+    g.beginPath(); g.arc(-S*0.26,S*0.78,S*0.1,0,6.2832); g.fill();
+    g.beginPath(); g.arc(S*0.26,S*0.78,S*0.1,0,6.2832); g.fill();
+  }
   function drawCharacter(g, ch, S){
     g.save();
     if(ch.id==='ice') drawIce(g,S);
     else if(ch.id==='ghost') drawGhostBack(g,S);
+    else if(ch.id==='alien') drawAlien(g,S);
     else drawRoboBack(g,S);
     g.restore();
   }
