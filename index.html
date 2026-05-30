@@ -593,14 +593,13 @@
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
     }
     // photographic worlds layered over the procedural sky, with slow crossfades:
-    //   world 1 (Dream Dunes)   full <800  -> fades out by 1300
-    //   world 2 (Floating Isles) mixes in 1000..1500 (FULLY there at 1500), holds, fades out 2000..2500
+    //   world 1 (Dream Dunes) is the opaque base; world 2 crossfades IN on top of it (no sky bleed-through):
+    //     starts fading at 900, FULLY there at 1500, holds, then fades out 2000..2500 to the procedural worlds.
     const hg=maxRy*10;
     const ramp=(x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a)));
-    const a1=1-ramp(hg,800,1300);
-    const a2=ramp(hg,1000,1500)*(1-ramp(hg,2000,2500));
-    if(photo2Ok && a2>0){ ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore(); }   // drawn under p1
-    if(photoOk  && a1>0){ ctx.save(); ctx.globalAlpha=a1; drawPhotoBg(PHOTO, 0);    ctx.restore(); }   // fades to reveal p2
+    const a2=ramp(hg,900,1500)*(1-ramp(hg,2000,2500));     // world 2 opacity
+    if(photoOk  && hg<1500){ ctx.save(); ctx.globalAlpha=1;  drawPhotoBg(PHOTO, 0);    ctx.restore(); }  // world 1 base (full until covered)
+    if(photo2Ok && a2>0)   { ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore(); }  // world 2 crossfades over it
   }
   function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
     const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
