@@ -567,12 +567,33 @@
   // ---- photographic world background (loaded image) ----
   const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg';   // world 1 — Dream Dunes
   const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg';   // world 2 — Floating Isles
-  function drawPhotoBg(img, h0){                     // h0 = height where this photo starts panning
+  function drawPhotoBg(img, h0, g){                  // h0 = height where this photo starts panning; g = target ctx
+    g=g||ctx;
     const iw=img.naturalWidth, ih=img.naturalHeight; if(!iw||!ih) return;
     const scale=Math.max(W/iw, H/ih)*1.25;           // cover + 25% zoom for vertical pan room
     const dw=iw*scale, dh=ih*scale, dx=(W-dw)/2, pan=dh-H;
     const f=Math.min(1,Math.max(0,((maxRy*10)-(h0||0))/900));   // pans bottom -> top across its own world band
-    ctx.drawImage(img, dx, -pan*(1-f), dw, dh);
+    g.drawImage(img, dx, -pan*(1-f), dw, dh);
+  }
+  let _off=null,_offCtx=null;                        // offscreen buffer for the feathered world seam
+  function offCtx(){
+    if(!_off || _off.width!==canvas.width || _off.height!==canvas.height){
+      _off=document.createElement('canvas'); _off.width=canvas.width; _off.height=canvas.height; _offCtx=_off.getContext('2d');
+    }
+    return _offCtx;
+  }
+  // Stack two worlds vertically: lower (panned to its sky) under, upper sliding down from the top,
+  // blended across a soft seam so the top of world A merges into the bottom of world B.
+  function drawWorldSeam(lower, lowerH0, upper, upperH0, seamY, feather){
+    drawPhotoBg(lower, lowerH0);                     // world below = opaque base
+    const o=offCtx(); o.setTransform(DPR,0,0,DPR,0,0); o.clearRect(0,0,W,H);
+    drawPhotoBg(upper, upperH0, o);                  // world above, into the buffer
+    o.globalCompositeOperation='destination-out';    // feather its bottom edge away
+    const grad=o.createLinearGradient(0,seamY-feather,0,seamY);
+    grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,1)');
+    o.fillStyle=grad; o.fillRect(0,seamY-feather,W,H-(seamY-feather)+2);
+    o.globalCompositeOperation='source-over';
+    ctx.drawImage(_off,0,0,W,H);                      // composite the feathered upper world over the lower
   }
   function mul(c,f){ return [Math.round(Math.min(255,c[0]*f)),Math.round(Math.min(255,c[1]*f)),Math.round(Math.min(255,c[2]*f))]; }
   function rgba(c,a){ return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
@@ -593,13 +614,23 @@
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
     }
     // photographic worlds layered over the procedural sky, with slow crossfades:
-    //   world 1 (Dream Dunes) is the opaque base; world 2 crossfades IN on top of it (no sky bleed-through):
-    //     starts fading at 900, FULLY there at 1500, holds, then fades out 2000..2500 to the procedural worlds.
+    //   Worlds are STACKED vertically — you climb up out of world 1 into world 2, not a fade.
+    //   World 2 slides down from the top; its bottom edge blends into the top of world 1 at a soft seam.
+    //     <900: pure world 1.  900..1500: seam descends top->bottom (fully world 2 at 1500).
+    //     1500..2000: hold.    2000..2500: world 2 fades out to the procedural worlds.
     const hg=maxRy*10;
     const ramp=(x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a)));
-    const a2=ramp(hg,900,1500)*(1-ramp(hg,2000,2500));     // world 2 opacity
-    if(photoOk  && hg<1500){ ctx.save(); ctx.globalAlpha=1;  drawPhotoBg(PHOTO, 0);    ctx.restore(); }  // world 1 base (full until covered)
-    if(photo2Ok && a2>0)   { ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore(); }  // world 2 crossfades over it
+    const FEATHER=H*0.28;                                   // height of the blended merge band
+    if(!photoOk && !photo2Ok){ /* nothing loaded yet */ }
+    else if(hg<900 || !photo2Ok){ drawPhotoBg(PHOTO,0); }   // pure world 1
+    else if(hg<1500 && photoOk){                            // the climb-through merge
+      const prog=(hg-900)/600;                              // 0..1
+      const seamY=prog*(H+FEATHER);                         // world-2 bottom edge descends past the screen
+      drawWorldSeam(PHOTO,0, PHOTO2,1000, seamY, FEATHER);
+    } else {                                                // world 2 (then fades to procedural up high)
+      const a2=1-ramp(hg,2000,2500);
+      ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore();
+    }
   }
   function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
     const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
