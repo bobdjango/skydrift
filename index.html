@@ -623,7 +623,7 @@
     //     1500..2000: hold.    2000..2500: world 2 fades out to the procedural worlds.
     const hg=maxRy*10;
     const ramp=(x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a)));
-    const FEATHER=H*0.55;                                   // deep blended merge band — worlds connect, not a thin fade
+    const FEATHER=H*0.16;                                   // thin join — just a bit of overlap (W1 top meets W2 bottom), no ghosting
     if(!photoOk && !photo2Ok){ /* nothing loaded yet */ }
     else if(hg<900 || !photo2Ok){ drawPhotoBg(PHOTO,0); }   // pure world 1
     else if(hg<1500 && photoOk){                            // the climb-through merge
