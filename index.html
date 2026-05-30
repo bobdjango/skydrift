@@ -568,8 +568,9 @@
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
   // ---- photographic world background (loaded image) ----
-  const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg';   // world 1 — Dream Dunes
-  const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg';   // world 2 — Floating Isles
+  const IMGV='5';   // bump this whenever a world image changes — forces phones/CDN to re-download (no stale cache)
+  const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg?v='+IMGV;   // world 1 — Dream Dunes
+  const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg?v='+IMGV;   // world 2 — Cloud Kingdom
   function drawPhotoBg(img, h0, g){                  // h0 = height where this photo starts panning; g = target ctx
     g=g||ctx;
     const iw=img.naturalWidth, ih=img.naturalHeight; if(!iw||!ih) return;
