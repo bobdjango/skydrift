@@ -565,13 +565,14 @@
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
   // ---- photographic world background (loaded image) ----
-  const PHOTO=new Image(); let photoOk=false; PHOTO.onload=()=>photoOk=true; PHOTO.src='world1.jpg';
-  function drawPhotoBg(){
-    const iw=PHOTO.naturalWidth, ih=PHOTO.naturalHeight;
-    const scale=Math.max(W/iw, H/ih)*1.25;          // cover + 25% zoom for vertical pan room
+  const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg';   // world 1 — Dream Dunes
+  const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg';   // world 2 — Floating Isles
+  function drawPhotoBg(img, h0){                     // h0 = height where this photo starts panning
+    const iw=img.naturalWidth, ih=img.naturalHeight; if(!iw||!ih) return;
+    const scale=Math.max(W/iw, H/ih)*1.25;           // cover + 25% zoom for vertical pan room
     const dw=iw*scale, dh=ih*scale, dx=(W-dw)/2, pan=dh-H;
-    const f=Math.min(1,(maxRy*10)/900);             // climb pans from the dunes (bottom) up into open sky (top)
-    ctx.drawImage(PHOTO, dx, -pan*(1-f), dw, dh);    // image is already dreamy pastel — no grade needed
+    const f=Math.min(1,Math.max(0,((maxRy*10)-(h0||0))/900));   // pans bottom -> top across its own world band
+    ctx.drawImage(img, dx, -pan*(1-f), dw, dh);
   }
   function mul(c,f){ return [Math.round(Math.min(255,c[0]*f)),Math.round(Math.min(255,c[1]*f)),Math.round(Math.min(255,c[2]*f))]; }
   function rgba(c,a){ return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
@@ -591,12 +592,15 @@
       g.addColorStop(0,rgbs(P.A)); g.addColorStop(0.6,rgbs(P.B)); g.addColorStop(1,rgbs(P.C));
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
     }
-    // the photo is only the FIRST world (Dream Dunes); crossfade it out by ~1000 height
-    if(photoOk){
-      const hg=maxRy*10;
-      const a=1-Math.min(1,Math.max(0,(hg-700)/300));       // full <700, gone by 1000
-      if(a>0){ ctx.save(); ctx.globalAlpha=a; drawPhotoBg(); ctx.restore(); }
-    }
+    // photographic worlds layered over the procedural sky, with slow crossfades:
+    //   world 1 (Dream Dunes)   full <700  -> fades out by 1200
+    //   world 2 (Floating Isles) fades in 900..1400, holds, fades out 1950..2450 -> procedural worlds beyond
+    const hg=maxRy*10;
+    const ramp=(x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a)));
+    const a1=1-ramp(hg,700,1200);
+    const a2=ramp(hg,900,1400)*(1-ramp(hg,1950,2450));
+    if(photo2Ok && a2>0){ ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore(); }   // drawn under p1
+    if(photoOk  && a1>0){ ctx.save(); ctx.globalAlpha=a1; drawPhotoBg(PHOTO, 0);    ctx.restore(); }   // fades to reveal p2
   }
   function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
     const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
