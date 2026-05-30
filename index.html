@@ -262,12 +262,13 @@
   }
 
   // ----- State -----
-  const ST = { MENU:0, PLAY:1, DEAD:2 };
+  const ST = { MENU:0, PLAY:1, DEAD:2, FLIP:3 };   // FLIP = scripted world-change sequence
   let state = ST.MENU;
   let ry, vy, jumpsLeft, jumpFlash, maxRy, distance, worldSpeed, distSinceObs, nextGap, cloudY, leftGround;
   let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT, hudP, hudLast;
-  let flipT=0, flipFrom=0;   // world-change animation: timer + the world we're flipping FROM
-  const FLIP_DUR=0.8;        // backflip + flash duration (seconds)
+  // scripted world-change ("bounce in place -> announce -> backflip -> swap -> tap to continue")
+  let flipFrom=0, flipPhase=0, flipClock=0, flipBaseRy=0, charSpin=0, flashT=0;
+  const HOP=0.62;            // duration of one in-place bounce during the sequence
   let clouds, particles, pops, stars, motes;
   let shake, deathTimer;
   let DEBUG_BOT=false, FORCE=null, BG=0, START_H=0;   // dev-only helpers (BG = background style; START_H = warp-start height)
@@ -296,7 +297,8 @@
   function reset(){
     ry=0; vy=0; jumpsLeft=2; jumpFlash=0; maxRy=0; distance=0;
     worldSpeed=16; distSinceObs=0; nextGap=15; cloudY=1.0; leftGround=false;
-    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0; flipT=0; flipFrom=0;
+    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0;
+    flipFrom=0; flipPhase=0; flipClock=0; flipBaseRy=0; charSpin=0; flashT=0;
     clouds=[]; particles=[]; pops=[]; initMotes();
     shake=0; deathTimer=0;
     // dev warp-start: begin already at START_H height so the world transition is quick to reach
@@ -338,6 +340,7 @@
 
   // ----- Input: tap = jump to reach clouds; tapping AS you land = a PERFECT bounce -----
   function onTap(){
+    if(state===ST.FLIP){ if(flipPhase===2 && flashT<=0) resumeFromFlip(); return; }   // tap to continue after the swap
     if(state!==ST.PLAY) return;
     tapBuffer=0.18;   // remember the tap briefly — if you land on a cloud now, it's a PERFECT
     let onCloud=false;
@@ -439,9 +442,27 @@
   function addPop(x,y,t){ pops.push({x,y,vy:-50,life:0,max:0.8,text:t}); }
 
   // ----- Update -----
+  // scripted world-change: bounce on the same cloud, announce, backflip, swap on landing, then wait for a tap
+  function updateFlip(dt){
+    flipClock+=dt;
+    const u=(flipClock % HOP)/HOP; ry=flipBaseRy + Math.sin(u*Math.PI)*1.0;   // bounce in place
+    vy=0;
+    if(flipPhase===0){                       // ANNOUNCE — one hop while the new world's name is shown
+      if(flipClock>=HOP){ flipPhase=1; flipClock=0; }
+    } else if(flipPhase===1){                // BACKFLIP — one hop with a full spin
+      charSpin=(flipClock/HOP)*Math.PI*2;
+      if(flipClock>=HOP){ flipPhase=2; flipClock=0; charSpin=0; flashT=0.5; }  // lands -> world + clouds swap, flash bursts
+    } else {                                 // WAIT — keep bouncing until the player taps to continue
+      if(DEBUG_BOT && flipClock>0.6) resumeFromFlip();
+    }
+    if(flashT>0) flashT-=dt;
+  }
+  function resumeFromFlip(){ state=ST.PLAY; ry=flipBaseRy; vy=6.0; jumpsLeft=2; bannerT=0; charSpin=0; }
+
   function update(dt){
     if(state===ST.DEAD){ deathTimer+=dt; shake*=Math.pow(0.001,dt); updateParticles(dt);
       if(deathTimer>0.9) finishToGameOver(); return; }
+    if(state===ST.FLIP){ updateFlip(dt); updateParticles(dt); return; }
     if(state!==ST.PLAY){ updateParticles(dt); return; }
 
     if(jumpFlash>0) jumpFlash-=dt;
@@ -474,10 +495,13 @@
       if(leftGround){ die(); return; } }            // fell back to the ground -> game over
     if(ry>maxRy) maxRy=ry;
     const tier=Math.min(SKY_NAMES.length-1, Math.floor(maxRy*10/1000));   // new world every 1000 height
-    if(tier>skyTier){ flipFrom=skyTier; skyTier=tier; flipT=FLIP_DUR;      // BACKFLIP world-change moment
-      bannerText='✦ '+SKY_NAMES[tier]+' ✦'; bannerT=2.2; }
+    if(tier>skyTier){                                  // -> enter the scripted world-change sequence
+      flipFrom=skyTier; skyTier=tier;
+      state=ST.FLIP; flipPhase=0; flipClock=0; charSpin=0; flashT=0; flipBaseRy=Math.max(ry,maxRy); vy=0;
+      bannerText='✦ '+SKY_NAMES[tier]+' ✦'; bannerT=4;
+      return;
+    }
     if(bannerT>0) bannerT-=dt;
-    if(flipT>0) flipT-=dt;
 
     // spawn the next (higher) cloud on the ladder
     distSinceObs+=worldSpeed*dt;
@@ -549,9 +573,15 @@
     for(const c of sorted) drawCloud(c);
     if(state!==ST.DEAD || deathTimer<0.4) drawRobot();
     drawParticles(); drawPops(); drawDowndraft(); drawVignette(); drawBanner();
-    if(flipT>0){                                            // world-change flash — brightest at mid-flip (hides the swap)
-      const k=1-flipT/FLIP_DUR, a=Math.sin(k*Math.PI)*0.9;
-      ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff4fb'; ctx.fillRect(0,0,W,H); ctx.restore();
+    if(flashT>0){                                           // burst when the backflip lands — hides the world swap
+      ctx.save(); ctx.globalAlpha=Math.min(1,flashT/0.5)*0.95; ctx.fillStyle='#fff4fb'; ctx.fillRect(0,0,W,H); ctx.restore();
+    }
+    if(state===ST.FLIP && flipPhase===2 && flashT<=0){      // wait for the player to continue
+      ctx.save(); ctx.textAlign='center';
+      ctx.font='800 '+Math.round(H*0.028)+'px system-ui,sans-serif';
+      ctx.fillStyle='rgba(255,255,255,'+(0.55+0.45*Math.sin(last*4))+')';
+      ctx.fillText('TAP TO CONTINUE', W/2, H*0.62);
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -583,12 +613,12 @@
   ];
   // which world is shown on screen RIGHT NOW — during the first half of the flip we still show the OLD
   // world, then it swaps at the flash peak (mid-flip) so the change is hidden behind the white burst.
-  function dispWorld(){ return (flipT>FLIP_DUR*0.5) ? flipFrom : skyTier; }
+  function dispWorld(){ return (state===ST.FLIP && flipPhase<2) ? flipFrom : skyTier; }   // swaps when the backflip lands
   function cloudPal(){ return CLOUD_PALS[Math.min(CLOUD_PALS.length-1, dispWorld())]; }
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
   // ---- photographic world background (loaded image) ----
-  const IMGV='6';   // bump this whenever a world image changes — forces phones/CDN to re-download (no stale cache)
+  const IMGV='7';   // bump this whenever a world image changes — forces phones/CDN to re-download (no stale cache)
   const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg?v='+IMGV;   // world 1 — Dream Dunes
   const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg?v='+IMGV;   // world 2 — Cloud Kingdom
   function drawPhotoBg(img, h0, g){                  // h0 = height where this photo starts panning; g = target ctx
@@ -1154,8 +1184,7 @@
       const altF=Math.min(1,ry/8);
       ctx.beginPath(); ctx.ellipse(gp.x,gp.y,sz*1.4*(1-altF*0.6),sz*0.45*(1-altF*0.6),0,0,6.2832); ctx.fill(); ctx.restore(); }
     ctx.save(); ctx.translate(p.x,p.y);
-    const spin = flipT>0 ? (1-flipT/FLIP_DUR)*Math.PI*2 : 0;   // one full backflip across the world-change
-    ctx.rotate(Math.max(-0.18,Math.min(0.18,vy*0.018)) - spin);
+    ctx.rotate(Math.max(-0.18,Math.min(0.18,vy*0.018)) - charSpin);   // charSpin drives the backflip
     const st=Math.max(-0.16,Math.min(0.26, vy*0.02)); ctx.scale(1-st*0.5, 1+st);   // squash & stretch juice
     drawCharacter(ctx, CHARACTERS[selChar], sz);
     ctx.restore();
