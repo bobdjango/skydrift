@@ -581,14 +581,22 @@
     return { A:lc(SKIES[i].a,SKIES[j].a,t), B:lc(SKIES[i].b,SKIES[j].b,t), C:lc(SKIES[i].c,SKIES[j].c,t) };
   }
   function drawSky(){
-    if(photoOk) return drawPhotoBg();       // real photographic background when loaded
     const P=skyPalette();
-    if(BG===1) return drawSkyCinematic(P);
-    if(BG===2) return drawSkyAurora(P);
-    if(BG===3) return drawSkyStrata(P);
-    const g=ctx.createLinearGradient(0,0,0,H);              // BG 0 — current flat 3-stop gradient
-    g.addColorStop(0,rgbs(P.A)); g.addColorStop(0.6,rgbs(P.B)); g.addColorStop(1,rgbs(P.C));
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // base procedural sky world (morphs through the palettes as you climb)
+    if(BG===1) drawSkyCinematic(P);
+    else if(BG===2) drawSkyAurora(P);
+    else if(BG===3) drawSkyStrata(P);
+    else {
+      const g=ctx.createLinearGradient(0,0,0,H);            // BG 0 — flat 3-stop gradient
+      g.addColorStop(0,rgbs(P.A)); g.addColorStop(0.6,rgbs(P.B)); g.addColorStop(1,rgbs(P.C));
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    }
+    // the photo is only the FIRST world (Dream Dunes); crossfade it out by ~1000 height
+    if(photoOk){
+      const hg=maxRy*10;
+      const a=1-Math.min(1,Math.max(0,(hg-700)/300));       // full <700, gone by 1000
+      if(a>0){ ctx.save(); ctx.globalAlpha=a; drawPhotoBg(); ctx.restore(); }
+    }
   }
   function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
     const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
