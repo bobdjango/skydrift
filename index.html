@@ -604,12 +604,13 @@
   ];
   const SKY_NAMES=['DREAM DUNES','CRYSTAL HAZE','CLOUD TEMPLE','AURORA DREAM','COSMIC DREAM'];
   // per-world normal-cloud colours (top, bottom, rim) — clouds recolour to fit each world
+  // bright white-topped clouds with a soft world-tinted underside — readable on every background
   const CLOUD_PALS=[
-    {top:'#ffc4de', bot:'#a6c2f4', rim:'#8aa8ea'},   // 0 Dream Dunes — pink -> soft blue
-    {top:'#ffe1c4', bot:'#ff9ec6', rim:'#e87aa8'},   // 1 Cloud City  — peach -> rose
-    {top:'#d6e4ff', bot:'#9aa6f0', rim:'#7a86d8'},   // 2 Cloud Temple — periwinkle
-    {top:'#bff0e6', bot:'#7fd6c2', rim:'#4fae9c'},   // 3 Aurora — mint/teal
-    {top:'#cdbcff', bot:'#8a78d8', rim:'#6a58b8'},   // 4 Cosmic — violet
+    {top:'#ffffff', bot:'#ffc8e2', rim:'#f2a6cc'},   // 0 Dream Dunes — white -> soft pink
+    {top:'#f4faff', bot:'#aac6ee', rim:'#8aa6d6'},   // 1 Moonlit Village — moonlit white -> cool blue
+    {top:'#ffffff', bot:'#c4d2ff', rim:'#9aa8e0'},   // 2 Cloud Temple — periwinkle
+    {top:'#f4fffb', bot:'#a6e6d4', rim:'#6fc2ae'},   // 3 Aurora — mint/teal
+    {top:'#fbf4ff', bot:'#c0aef0', rim:'#9484d0'},   // 4 Cosmic — soft violet
   ];
   // which world is shown on screen RIGHT NOW — during the first half of the flip we still show the OLD
   // world, then it swaps at the flash peak (mid-flip) so the change is hidden behind the white burst.
@@ -624,7 +625,7 @@
   function drawPhotoBg(img, h0, g){                  // h0 = height where this photo starts panning; g = target ctx
     g=g||ctx;
     const iw=img.naturalWidth, ih=img.naturalHeight; if(!iw||!ih) return;
-    const scale=Math.max(W/iw, H/ih)*1.25;           // cover + 25% zoom for vertical pan room
+    const scale=Math.max(W/iw, H/ih)*1.02;           // pure cover (tiny margin) — no heavy zoom-in
     const dw=iw*scale, dh=ih*scale, dx=(W-dw)/2, pan=dh-H;
     const f=Math.min(1,Math.max(0,((maxRy*10)-(h0||0))/900));   // pans bottom -> top across its own world band
     g.drawImage(img, dx, -pan*(1-f), dw, dh);
