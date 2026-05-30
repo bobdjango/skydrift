@@ -266,6 +266,8 @@
   let state = ST.MENU;
   let ry, vy, jumpsLeft, jumpFlash, maxRy, distance, worldSpeed, distSinceObs, nextGap, cloudY, leftGround;
   let combo, bonus, tapBuffer, lastType, pendingBig, downdraft, ddCool, jammed, skyTier, bannerText, bannerT, hudP, hudLast;
+  let flipT=0, flipFrom=0;   // world-change animation: timer + the world we're flipping FROM
+  const FLIP_DUR=0.8;        // backflip + flash duration (seconds)
   let clouds, particles, pops, stars, motes;
   let shake, deathTimer;
   let DEBUG_BOT=false, FORCE=null, BG=0, START_H=0;   // dev-only helpers (BG = background style; START_H = warp-start height)
@@ -294,7 +296,7 @@
   function reset(){
     ry=0; vy=0; jumpsLeft=2; jumpFlash=0; maxRy=0; distance=0;
     worldSpeed=16; distSinceObs=0; nextGap=15; cloudY=1.0; leftGround=false;
-    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0;
+    combo=0; bonus=0; tapBuffer=0; lastType='normal'; pendingBig=0; downdraft=0; ddCool=5; jammed=0; skyTier=0; bannerText=''; bannerT=0; hudP=0; hudLast=0; flipT=0; flipFrom=0;
     clouds=[]; particles=[]; pops=[]; initMotes();
     shake=0; deathTimer=0;
     // dev warp-start: begin already at START_H height so the world transition is quick to reach
@@ -472,8 +474,10 @@
       if(leftGround){ die(); return; } }            // fell back to the ground -> game over
     if(ry>maxRy) maxRy=ry;
     const tier=Math.min(SKY_NAMES.length-1, Math.floor(maxRy*10/1000));   // new world every 1000 height
-    if(tier>skyTier){ skyTier=tier; bannerText='✦ '+SKY_NAMES[tier]+' ✦'; bannerT=2.2; }
+    if(tier>skyTier){ flipFrom=skyTier; skyTier=tier; flipT=FLIP_DUR;      // BACKFLIP world-change moment
+      bannerText='✦ '+SKY_NAMES[tier]+' ✦'; bannerT=2.2; }
     if(bannerT>0) bannerT-=dt;
+    if(flipT>0) flipT-=dt;
 
     // spawn the next (higher) cloud on the ladder
     distSinceObs+=worldSpeed*dt;
@@ -545,6 +549,10 @@
     for(const c of sorted) drawCloud(c);
     if(state!==ST.DEAD || deathTimer<0.4) drawRobot();
     drawParticles(); drawPops(); drawDowndraft(); drawVignette(); drawBanner();
+    if(flipT>0){                                            // world-change flash — brightest at mid-flip (hides the swap)
+      const k=1-flipT/FLIP_DUR, a=Math.sin(k*Math.PI)*0.9;
+      ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff4fb'; ctx.fillRect(0,0,W,H); ctx.restore();
+    }
     ctx.restore();
   }
   function drawBanner(){
@@ -565,10 +573,22 @@
     {a:[2,3,14],    b:[12,14,46],   c:[38,28,80]},      // SPACE
   ];
   const SKY_NAMES=['DREAM DUNES','CRYSTAL HAZE','CLOUD TEMPLE','AURORA DREAM','COSMIC DREAM'];
+  // per-world normal-cloud colours (top, bottom, rim) — clouds recolour to fit each world
+  const CLOUD_PALS=[
+    {top:'#ffc4de', bot:'#a6c2f4', rim:'#8aa8ea'},   // 0 Dream Dunes — pink -> soft blue
+    {top:'#ffe1c4', bot:'#ff9ec6', rim:'#e87aa8'},   // 1 Cloud City  — peach -> rose
+    {top:'#d6e4ff', bot:'#9aa6f0', rim:'#7a86d8'},   // 2 Cloud Temple — periwinkle
+    {top:'#bff0e6', bot:'#7fd6c2', rim:'#4fae9c'},   // 3 Aurora — mint/teal
+    {top:'#cdbcff', bot:'#8a78d8', rim:'#6a58b8'},   // 4 Cosmic — violet
+  ];
+  // which world is shown on screen RIGHT NOW — during the first half of the flip we still show the OLD
+  // world, then it swaps at the flash peak (mid-flip) so the change is hidden behind the white burst.
+  function dispWorld(){ return (flipT>FLIP_DUR*0.5) ? flipFrom : skyTier; }
+  function cloudPal(){ return CLOUD_PALS[Math.min(CLOUD_PALS.length-1, dispWorld())]; }
   function lc(x,y,t){ return [Math.round(x[0]+(y[0]-x[0])*t),Math.round(x[1]+(y[1]-x[1])*t),Math.round(x[2]+(y[2]-x[2])*t)]; }
   function rgbs(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
   // ---- photographic world background (loaded image) ----
-  const IMGV='5';   // bump this whenever a world image changes — forces phones/CDN to re-download (no stale cache)
+  const IMGV='6';   // bump this whenever a world image changes — forces phones/CDN to re-download (no stale cache)
   const PHOTO =new Image(); let photoOk =false; PHOTO.onload =()=>photoOk =true; PHOTO.src ='world1.jpg?v='+IMGV;   // world 1 — Dream Dunes
   const PHOTO2=new Image(); let photo2Ok=false; PHOTO2.onload=()=>photo2Ok=true; PHOTO2.src='world2.jpg?v='+IMGV;   // world 2 — Cloud Kingdom
   function drawPhotoBg(img, h0, g){                  // h0 = height where this photo starts panning; g = target ctx
@@ -617,24 +637,11 @@
       g.addColorStop(0,rgbs(P.A)); g.addColorStop(0.6,rgbs(P.B)); g.addColorStop(1,rgbs(P.C));
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
     }
-    // photographic worlds layered over the procedural sky, with slow crossfades:
-    //   Worlds are STACKED vertically — you climb up out of world 1 into world 2, not a fade.
-    //   World 2 slides down from the top; its bottom edge blends into the top of world 1 at a soft seam.
-    //     <900: pure world 1.  900..1500: seam descends top->bottom (fully world 2 at 1500).
-    //     1500..2000: hold.    2000..2500: world 2 fades out to the procedural worlds.
-    const hg=maxRy*10;
-    const ramp=(x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a)));
-    const FEATHER=H*0.16;                                   // thin join — just a bit of overlap (W1 top meets W2 bottom), no ghosting
-    if(!photoOk && !photo2Ok){ /* nothing loaded yet */ }
-    else if(hg<900 || !photo2Ok){ drawPhotoBg(PHOTO,0); }   // pure world 1
-    else if(hg<1500 && photoOk){                            // the climb-through merge
-      const prog=(hg-900)/600;                              // 0..1
-      const seamY=prog*(H+FEATHER);                         // world-2 bottom edge descends past the screen
-      drawWorldSeam(PHOTO,0, PHOTO2,1000, seamY, FEATHER);
-    } else {                                                // world 2 (then fades to procedural up high)
-      const a2=1-ramp(hg,2000,2500);
-      ctx.save(); ctx.globalAlpha=a2; drawPhotoBg(PHOTO2,1000); ctx.restore();
-    }
+    // Photographic worlds swap DISCRETELY per world (no fade) — the backflip flash hides the cut.
+    const w=dispWorld();
+    if(w===0 && photoOk)       drawPhotoBg(PHOTO, 0);       // world 0 — Dream Dunes (pans 0..900)
+    else if(w===1 && photo2Ok) drawPhotoBg(PHOTO2, 1000);   // world 1 — Cloud City (pans bottom->top across 1000..1900)
+    // world 2+ : the procedural sky drawn above already shows through (no photo)
   }
   function drawSkyCinematic({A,B,C}){                       // BG 1 — richer cinematic gradient + horizon bloom
     const top=mul(A,0.5), hi=lc(C,[255,242,214],0.4);
@@ -772,7 +779,7 @@
   // bounce objects are COTTON-CANDY CLOUDS — saturated + soft rim, fits the dreamy sky AND pops on the pale pink
   function drawCloud(c){
     const p=project(0,c.wy,c.z); const r=p.s*0.82*(c.cscale||1)*(1+(c.puff>0?Math.sin(c.puff*9)*0.13:0)); if(r<1) return;
-    let top='#ffc4de', bot='#a6c2f4', rim='#8aa8ea', flick=1, faint=false;   // cotton-candy pink → soft blue mix
+    const _pal=cloudPal(); let top=_pal.top, bot=_pal.bot, rim=_pal.rim, flick=1, faint=false;   // normal clouds recolour per world
     if(c.type==='fake'){ const near=Math.max(0,Math.min(1,1-(c.z-Z_ROBOT)/24)); flick=near>0.5?(0.62+0.38*Math.sin(distance*1.3)):1; faint=true; top='#eef0f6'; bot='#cbc6d8'; rim='#b3adc2'; }
     else if(c.type==='boost'){ top='#d4fbff'; bot='#3fd0f5'; rim='#1fa6d0'; }
     else if(c.type==='jam'){ top='#ffd0ea'; bot='#ff5aa8'; rim='#d63a86'; }
@@ -1146,7 +1153,9 @@
     if(gp.y>horizon() && gp.y<H+40){ ctx.save(); ctx.fillStyle='rgba(20,8,40,.28)';
       const altF=Math.min(1,ry/8);
       ctx.beginPath(); ctx.ellipse(gp.x,gp.y,sz*1.4*(1-altF*0.6),sz*0.45*(1-altF*0.6),0,0,6.2832); ctx.fill(); ctx.restore(); }
-    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.max(-0.18,Math.min(0.18,vy*0.018)));
+    ctx.save(); ctx.translate(p.x,p.y);
+    const spin = flipT>0 ? (1-flipT/FLIP_DUR)*Math.PI*2 : 0;   // one full backflip across the world-change
+    ctx.rotate(Math.max(-0.18,Math.min(0.18,vy*0.018)) - spin);
     const st=Math.max(-0.16,Math.min(0.26, vy*0.02)); ctx.scale(1-st*0.5, 1+st);   // squash & stretch juice
     drawCharacter(ctx, CHARACTERS[selChar], sz);
     ctx.restore();
